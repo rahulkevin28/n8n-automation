@@ -1,0 +1,5 @@
+SQLAlchemy>=2,<3
+bcrypt>=4,<6
+PyJWT>=2,<3
+alembic>=1.13,<2
+psycopg[binary]>=3.2,<4
