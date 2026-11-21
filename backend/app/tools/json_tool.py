@@ -57,7 +57,12 @@ def set(value: Any, path: str, new_value: Any) -> Any:
 
 
 def _parts(path: str) -> list[str]:
-    parts = path.strip().split(".")
+    normalized = path.strip()
+    if normalized.startswith("$."):
+        normalized = normalized[2:]
+    elif normalized == "$":
+        return []
+    parts = normalized.split(".")
     if any(not part or part in {"__class__", "__dict__", "__globals__"} for part in parts):
         raise ValueError("invalid JSON path")
     return parts
