@@ -43,3 +43,13 @@ def test_sales_commission_data_flow_uses_parsed_object_and_json_paths():
     ]})
     assert result.status == "success"
     assert result.steps[-1].output == 3200
+
+
+@pytest.mark.parametrize("path", ["base_salary", "$.base_salary", "total_sales", "$.total_sales"])
+def test_set_paths_work_on_the_exact_parsed_sales_object(path):
+    result = WorkflowExecutor().execute({"id": "set-sales", "name": "set", "description": "", "steps": [
+        {"id": "parse_initial_data", "tool": "json", "action": "parse", "inputs": {"value": '{"base_salary":2000,"total_sales":12000}'}},
+        {"id": "set_value", "tool": "json", "action": "set", "inputs": {"value": {"$ref": "parse_initial_data"}, "path": path, "new_value": 999}},
+    ]})
+    assert result.status == "success"
+    assert result.steps[-1].output[path.removeprefix("$.")] == 999

@@ -36,6 +36,8 @@ def set(value: Any, path: str, new_value: Any) -> Any:
     parts = _parts(path)
     if not parts:
         raise ValueError("JSON path is required")
+    if not isinstance(value, (dict, list)):
+        raise TypeError("JSON set value must be a parsed object or array")
     current = value
     for part in parts[:-1]:
         if isinstance(current, dict) and part in current:
