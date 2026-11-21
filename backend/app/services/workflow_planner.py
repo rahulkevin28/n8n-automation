@@ -43,8 +43,13 @@ class WorkflowPlanner:
             "inputs and may have max_retries (0-5), timeout_seconds (>0), true_next and false_next. "
             f"The only allowed tool actions are {json.dumps(actions)}. "
             "Use sequential steps and $ref objects such as {\"$ref\":\"step_id\"} when a step needs "
-            "a previous output. For condition.if, inputs must include value and one of equals, not_equals, "
-            "greater_than, less_than, contains, is_empty; provide explicit true_next and false_next step IDs. "
+            "a previous output. Every condition.if step MUST have inputs.value and inputs.operator. "
+            "operator MUST be exactly one of equals, not_equals, greater_than, less_than, contains, is_empty. "
+            "For every operator except is_empty, inputs.target is also required. A valid condition example is "
+            "{\"id\":\"check_sales_performance\",\"tool\":\"condition\",\"action\":\"if\","
+            "\"inputs\":{\"value\":{\"$ref\":\"sales_step\"},\"operator\":\"greater_than\",\"target\":100},"
+            "\"true_next\":\"high_sales\",\"false_next\":\"low_sales\"}. "
+            "Condition values must be a literal or a valid reference to a previous step output; never omit them. "
             "Never invent tools/actions, include executable code (Never include code), generate Python, execute code, or omit a branch. Avoid unnecessary nodes. "
             f"Task: {task_description}"
         )
@@ -70,7 +75,13 @@ class WorkflowPlanner:
             except (json.JSONDecodeError, TypeError, ValidationError, ValueError) as exc:
                 last_error = InvalidPlannerResponse(f"Gemini returned invalid workflow: {exc}")
                 if attempt == 0:
-                    current_prompt = f"{prompt}\nThe previous response was rejected with this exact validation error: {exc}. Regenerate the complete workflow JSON and correct that error. Do not omit condition inputs."
+                    current_prompt = (
+                        f"The workflow JSON for this task was rejected: {task_description}\n"
+                        f"Exact validation error: {exc}\n"
+                        "Return a complete corrected Workflow JSON object, not a patch. For every condition.if step, "
+                        "include inputs.value, inputs.operator from [equals, not_equals, greater_than, less_than, contains, is_empty], "
+                        "and inputs.target unless operator is is_empty. Preserve valid step IDs, references, and true_next/false_next."
+                    )
                     continue
         raise last_error or InvalidPlannerResponse("Gemini returned invalid workflow")
 

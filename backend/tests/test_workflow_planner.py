@@ -91,12 +91,13 @@ def test_planner_condition_requires_value_and_operator():
 
 
 def test_planner_corrects_invalid_condition_on_regeneration():
-    invalid = {"id": "wf", "name": "branch", "description": "", "steps": [{"id": "check", "tool": "condition", "action": "if", "inputs": {}, "true_next": "yes", "false_next": "no"}, {"id": "yes", "tool": "text", "action": "uppercase", "inputs": {"text": "y"}}, {"id": "no", "tool": "text", "action": "uppercase", "inputs": {"text": "n"}}]}
+    invalid = {"id": "wf", "name": "branch", "description": "", "steps": [{"id": "s5_check_sales_performance", "tool": "condition", "action": "if", "inputs": {"value": {"$ref": "sales_step"}}, "true_next": "yes", "false_next": "no"}, {"id": "yes", "tool": "text", "action": "uppercase", "inputs": {"text": "y"}}, {"id": "no", "tool": "text", "action": "uppercase", "inputs": {"text": "n"}}]}
     valid = {**invalid, "steps": [{**invalid["steps"][0], "inputs": {"value": "sales", "operator": "equals", "target": "good"}}, *invalid["steps"][1:]]}
     prompts = []
     result = WorkflowPlanner(response_generator=lambda prompt: prompts.append(prompt) or json.dumps(invalid if len(prompts) == 1 else valid)).plan("check sales performance")
     assert result.steps[0].inputs["operator"] == "equals"
-    assert "requires a value" in prompts[1]
+    assert "requires an operator" in prompts[1]
+    assert "check sales performance" in prompts[1]
 
 
 def test_planner_regenerates_once_after_invalid_response():
