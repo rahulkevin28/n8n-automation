@@ -40,11 +40,13 @@ class WorkflowExecutor:
         _validate_workflow_structure(validated)
         results: list[StepResult] = []
         outputs: dict[str, Any] = {}
+        reference_aliases: dict[str, str] = {}
         failed = False
         by_id = {step.id: step for step in validated.steps}
         branch_targets = {target for step in validated.steps if step.tool == "condition" for target in (step.true_next, step.false_next)}
         current_id = validated.steps[0].id if validated.steps else None
         visited: set[str] = set()
+        branch_continuation: int | None = None
 
         while current_id is not None:
             if current_id in visited:
@@ -60,7 +62,7 @@ class WorkflowExecutor:
                 break
             attempts = 0
             try:
-                inputs = _resolve_references(step.inputs, outputs)
+                inputs = _resolve_references(step.inputs, outputs, reference_aliases)
                 while True:
                     attempts += 1
                     try:
@@ -72,10 +74,19 @@ class WorkflowExecutor:
                 outputs[step.id] = output
                 results.append(StepResult(step.id, "success", output=output, attempts=attempts))
                 if step.tool == "condition" and step.action == "if":
-                    current_id = step.true_next if output else step.false_next
+                    selected = step.true_next if output else step.false_next
+                    unselected = step.false_next if output else step.true_next
+                    if selected and unselected:
+                        reference_aliases[unselected] = selected
+                        branch_continuation = max(
+                            next(index for index, item in enumerate(validated.steps) if item.id == selected),
+                            next(index for index, item in enumerate(validated.steps) if item.id == unselected),
+                        ) + 1
+                    current_id = selected
                 else:
                     index = validated.steps.index(step)
-                    current_id = None if step.id in branch_targets else (validated.steps[index + 1].id if index + 1 < len(validated.steps) else None)
+                    next_index = branch_continuation if step.id in branch_targets and branch_continuation is not None else index + 1
+                    current_id = validated.steps[next_index].id if next_index < len(validated.steps) else None
             except Exception as exc:
                 message = str(exc)
                 results.append(StepResult(step.id, "failed", error=message, attempts=attempts))
@@ -136,16 +147,18 @@ def _validate_workflow_structure(workflow: Workflow) -> None:
         visit(step_id)
 
 
-def _resolve_references(value: Any, outputs: dict[str, Any]) -> Any:
+def _resolve_references(value: Any, outputs: dict[str, Any], aliases: dict[str, str] | None = None) -> Any:
+    aliases = aliases or {}
     if isinstance(value, dict):
         if set(value) == {"$ref"}:
             step_id = value["$ref"]
+            step_id = aliases.get(step_id, step_id)
             if not isinstance(step_id, str) or step_id not in outputs:
                 raise ValueError(f"Unknown or unavailable step output reference: {step_id!r}")
             return outputs[step_id]
-        return {key: _resolve_references(item, outputs) for key, item in value.items()}
+        return {key: _resolve_references(item, outputs, aliases) for key, item in value.items()}
     if isinstance(value, list):
-        return [_resolve_references(item, outputs) for item in value]
+        return [_resolve_references(item, outputs, aliases) for item in value]
     return value
 
 

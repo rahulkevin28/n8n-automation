@@ -51,3 +51,16 @@ def test_invalid_condition_is_rejected(operator):
 def test_malformed_branch_is_rejected():
     with pytest.raises(ValueError, match="requires true_next"):
         WorkflowExecutor().execute(wf([{"id": "check", "tool": "condition", "action": "if", "inputs": {"value": 1, "operator": "equals", "target": 1}}]))
+
+
+@pytest.mark.parametrize("value,expected", [("excellent", "EXCELLENT"), ("needs", "needs improvement")])
+def test_condition_branch_merge_uses_executed_output(value, expected):
+    result = WorkflowExecutor().execute(wf([
+        {"id": "check", "tool": "condition", "action": "if", "inputs": {"value": value, "operator": "equals", "target": "excellent"}, "true_next": "classify_excellent", "false_next": "classify_needs_improvement"},
+        {"id": "classify_excellent", "tool": "text", "action": "uppercase", "inputs": {"text": "excellent"}},
+        {"id": "classify_needs_improvement", "tool": "text", "action": "lowercase", "inputs": {"text": "NEEDS IMPROVEMENT"}},
+        {"id": "combine_results", "tool": "text", "action": "replace", "inputs": {"text": {"$ref": "classify_excellent"}, "old": " ", "new": " "}},
+    ]))
+    outputs = {step.id: step for step in result.steps}
+    assert result.status == "success"
+    assert outputs["combine_results"].output == expected
