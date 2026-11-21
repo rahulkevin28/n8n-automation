@@ -1,9 +1,11 @@
 import os
+import logging
 
 from dotenv import load_dotenv
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 def generate_response(prompt: str) -> str:
     api_key = os.getenv("GEMINI_API_KEY")
@@ -12,10 +14,13 @@ def generate_response(prompt: str) -> str:
 
     from google import genai
 
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-
-    return response.text
+    try:
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        text = getattr(response, "text", None)
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError("Gemini returned an empty response")
+        return text
+    except Exception:
+        logger.exception("Gemini workflow generation request failed")
+        raise

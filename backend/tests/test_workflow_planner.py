@@ -55,6 +55,11 @@ def test_gemini_failure_is_wrapped_without_leaking_details():
     assert "private provider detail" not in str(error.value)
 
 
+def test_empty_gemini_response_is_wrapped():
+    with pytest.raises(WorkflowPlanningError, match="generation failed"):
+        WorkflowPlanner(response_generator=lambda _: (_ for _ in ()).throw(RuntimeError("empty response"))).plan("make a workflow")
+
+
 def test_registry_action_list_is_the_registered_tool_surface():
     assert create_default_registry().available_actions() == {
         "calculator": ["add", "divide", "multiply", "subtract"],

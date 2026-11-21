@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from collections.abc import Callable
 from typing import Any
@@ -9,6 +10,8 @@ from app.engine.registry import ToolRegistry, create_default_registry
 from app.engine.executor import _validate_workflow_structure
 from app.models.workflow import Workflow
 from app.services.gemini_service import generate_response
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowPlanningError(Exception):
@@ -50,6 +53,7 @@ class WorkflowPlanner:
             try:
                 raw = self.response_generator(prompt)
             except Exception as exc:
+                logger.exception("Workflow planner response generation failed")
                 raise WorkflowPlanningError("Workflow generation failed") from exc
             try:
                 data: Any = json.loads(_strip_json_fence(raw))
