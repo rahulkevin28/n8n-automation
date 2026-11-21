@@ -53,3 +53,18 @@ def test_set_paths_work_on_the_exact_parsed_sales_object(path):
     ]})
     assert result.status == "success"
     assert result.steps[-1].output[path.removeprefix("$.")] == 999
+
+
+@pytest.mark.parametrize("path", ["base_salary", "$.base_salary"])
+def test_set_can_initialize_missing_final_key(path):
+    assert set({}, path, 2000) == {"base_salary": 2000}
+
+
+def test_sales_output_initialization_preserves_sequentially_added_fields():
+    result = WorkflowExecutor().execute({"id": "sales-output", "name": "Sales output", "description": "", "steps": [
+        {"id": "init_output_excellent", "tool": "json", "action": "set", "inputs": {"value": {}, "path": "base_salary", "new_value": 2000}},
+        {"id": "add_commission", "tool": "json", "action": "set", "inputs": {"value": {"$ref": "init_output_excellent"}, "path": "commission", "new_value": 1200}},
+        {"id": "add_total", "tool": "json", "action": "set", "inputs": {"value": {"$ref": "add_commission"}, "path": "total_earnings", "new_value": 3200}},
+    ]})
+    assert result.status == "success"
+    assert result.steps[-1].output == {"base_salary": 2000, "commission": 1200, "total_earnings": 3200}

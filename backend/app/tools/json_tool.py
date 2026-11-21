@@ -48,8 +48,6 @@ def set(value: Any, path: str, new_value: Any) -> Any:
             raise KeyError(f"JSON path not found: {path}")
     last = parts[-1]
     if isinstance(current, dict):
-        if last not in current:
-            raise KeyError(f"JSON path not found: {path}")
         current[last] = new_value
     elif isinstance(current, list) and last.isdigit() and int(last) < len(current):
         current[int(last)] = new_value
