@@ -99,8 +99,15 @@ def _validate_workflow_structure(workflow: Workflow) -> None:
         if step.tool == "condition":
             if step.action != "if" or not step.true_next or not step.false_next:
                 raise ValueError(f"condition step {step.id} requires true_next and false_next")
-            if "operator" not in step.inputs or "value" not in step.inputs:
-                raise ValueError(f"condition step {step.id} requires value and operator")
+            if "value" not in step.inputs:
+                raise ValueError(f"condition step {step.id} requires a value")
+            if "operator" not in step.inputs:
+                raise ValueError(f"condition step {step.id} requires an operator")
+            operators = {"equals", "not_equals", "greater_than", "less_than", "contains", "is_empty"}
+            if step.inputs["operator"] not in operators:
+                raise ValueError(f"condition step {step.id} has invalid operator: {step.inputs['operator']!r}")
+            if step.inputs["operator"] != "is_empty" and "target" not in step.inputs:
+                raise ValueError(f"condition step {step.id} requires a comparison target")
         elif step.true_next or step.false_next:
             raise ValueError(f"only condition steps may define branches: {step.id}")
     adjacency: dict[str, list[str]] = {}

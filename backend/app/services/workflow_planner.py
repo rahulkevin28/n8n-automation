@@ -49,9 +49,10 @@ class WorkflowPlanner:
             f"Task: {task_description}"
         )
         last_error: WorkflowPlanningError | None = None
+        current_prompt = prompt
         for attempt in range(2):
             try:
-                raw = self.response_generator(prompt)
+                raw = self.response_generator(current_prompt)
             except Exception as exc:
                 logger.exception("Workflow planner response generation failed")
                 raise WorkflowPlanningError("Workflow generation failed") from exc
@@ -69,6 +70,7 @@ class WorkflowPlanner:
             except (json.JSONDecodeError, TypeError, ValidationError, ValueError) as exc:
                 last_error = InvalidPlannerResponse(f"Gemini returned invalid workflow: {exc}")
                 if attempt == 0:
+                    current_prompt = f"{prompt}\nThe previous response was rejected with this exact validation error: {exc}. Regenerate the complete workflow JSON and correct that error. Do not omit condition inputs."
                     continue
         raise last_error or InvalidPlannerResponse("Gemini returned invalid workflow")
 

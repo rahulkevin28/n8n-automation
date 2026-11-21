@@ -81,6 +81,24 @@ def test_planner_accepts_refs_branches_and_execution_settings():
     assert result.steps[0].max_retries == 1
 
 
+def test_planner_condition_requires_value_and_operator():
+    base = {"id": "wf", "name": "branch", "description": "", "steps": [{"id": "check", "tool": "condition", "action": "if", "inputs": {"operator": "equals", "target": "yes"}, "true_next": "yes", "false_next": "no"}, {"id": "yes", "tool": "text", "action": "uppercase", "inputs": {"text": "y"}}, {"id": "no", "tool": "text", "action": "uppercase", "inputs": {"text": "n"}}]}
+    with pytest.raises(InvalidPlannerResponse, match="requires a value"):
+        WorkflowPlanner(response_generator=lambda _: json.dumps(base)).plan("check")
+    base["steps"][0]["inputs"] = {"value": "yes", "target": "yes"}
+    with pytest.raises(InvalidPlannerResponse, match="requires an operator"):
+        WorkflowPlanner(response_generator=lambda _: json.dumps(base)).plan("check")
+
+
+def test_planner_corrects_invalid_condition_on_regeneration():
+    invalid = {"id": "wf", "name": "branch", "description": "", "steps": [{"id": "check", "tool": "condition", "action": "if", "inputs": {}, "true_next": "yes", "false_next": "no"}, {"id": "yes", "tool": "text", "action": "uppercase", "inputs": {"text": "y"}}, {"id": "no", "tool": "text", "action": "uppercase", "inputs": {"text": "n"}}]}
+    valid = {**invalid, "steps": [{**invalid["steps"][0], "inputs": {"value": "sales", "operator": "equals", "target": "good"}}, *invalid["steps"][1:]]}
+    prompts = []
+    result = WorkflowPlanner(response_generator=lambda prompt: prompts.append(prompt) or json.dumps(invalid if len(prompts) == 1 else valid)).plan("check sales performance")
+    assert result.steps[0].inputs["operator"] == "equals"
+    assert "requires a value" in prompts[1]
+
+
 def test_planner_regenerates_once_after_invalid_response():
     responses = iter(["not json", json.dumps(VALID_WORKFLOW)])
     result = WorkflowPlanner(response_generator=lambda _: next(responses)).plan("uppercase")
