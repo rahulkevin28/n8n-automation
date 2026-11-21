@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from typing import Any
+import inspect
 
 
 ToolFunction = Callable[..., Any]
@@ -21,6 +22,18 @@ class ToolRegistry:
 
     def available_actions(self) -> dict[str, list[str]]:
         return {tool: sorted(actions) for tool, actions in sorted(self._tools.items())}
+
+    def input_schema(self) -> dict[str, dict[str, list[str]]]:
+        return {tool: {action: list(inspect.signature(function).parameters) for action, function in actions.items()} for tool, actions in self._tools.items()}
+
+    def validate_inputs(self, tool: str, action: str, inputs: dict[str, Any]) -> None:
+        function = self.get(tool, action)
+        if function is None:
+            raise ValueError(f"Unknown tool action: {tool}.{action}")
+        try:
+            inspect.signature(function).bind(**inputs)
+        except TypeError as exc:
+            raise ValueError(f"Invalid inputs for {tool}.{action}: {exc}") from exc
 
 
 def create_default_registry() -> ToolRegistry:

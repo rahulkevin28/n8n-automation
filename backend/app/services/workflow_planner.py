@@ -42,6 +42,7 @@ class WorkflowPlanner:
             "matching the Workflow schema: id, name, description, steps. Each step has id, tool, action, "
             "inputs and may have max_retries (0-5), timeout_seconds (>0), true_next and false_next. "
             f"The only allowed tool actions are {json.dumps(actions)}. "
+            f"Use these exact input argument names for each action: {json.dumps(self.registry.input_schema())}. "
             "Use sequential steps and $ref objects such as {\"$ref\":\"step_id\"} when a step needs "
             "a previous output. Every condition.if step MUST have inputs.value and inputs.operator. "
             "operator MUST be exactly one of equals, not_equals, greater_than, less_than, contains, is_empty. "

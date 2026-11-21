@@ -63,6 +63,7 @@ class WorkflowExecutor:
             attempts = 0
             try:
                 inputs = _resolve_references(step.inputs, outputs, reference_aliases)
+                self.registry.validate_inputs(step.tool, step.action, inputs)
                 while True:
                     attempts += 1
                     try:
