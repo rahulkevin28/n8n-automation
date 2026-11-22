@@ -29,6 +29,41 @@ def test_planner_validates_gemini_workflow_json():
     assert "Never include code" in prompts[0]
 
 
+def test_planner_prompt_requires_json_extraction_before_calculation():
+    prompts = []
+    planner = WorkflowPlanner(response_generator=lambda prompt: prompts.append(prompt) or json.dumps(VALID_WORKFLOW))
+    planner.plan("calculate price times quantity from JSON")
+    assert "complete output" in prompts[0]
+    assert "parse_initial_data" in prompts[0]
+    assert "never the complete parsed dictionary or numeric strings" in prompts[0]
+
+
+def test_planner_accepts_price_quantity_extraction_workflow():
+    workflow = {"id": "price-check", "name": "Price check", "description": "", "steps": [
+        {"id": "parse_initial_data", "tool": "json", "action": "parse", "inputs": {"value": '{"price":100,"quantity":5}'}},
+        {"id": "price", "tool": "json", "action": "get", "inputs": {"value": {"$ref": "parse_initial_data"}, "path": "price"}},
+        {"id": "quantity", "tool": "json", "action": "get", "inputs": {"value": {"$ref": "parse_initial_data"}, "path": "quantity"}},
+        {"id": "total", "tool": "calculator", "action": "multiply", "inputs": {"a": {"$ref": "price"}, "b": {"$ref": "quantity"}}},
+    ]}
+    result = WorkflowPlanner(response_generator=lambda _: json.dumps(workflow)).plan("calculate price times quantity")
+    assert result.steps[1].action == "get"
+    assert result.steps[2].action == "get"
+    assert result.steps[3].inputs == {"a": {"$ref": "price"}, "b": {"$ref": "quantity"}}
+
+
+def test_planner_accepts_sales_commission_extraction_workflow():
+    workflow = {"id": "sales", "name": "Sales commission", "description": "", "steps": [
+        {"id": "parse_initial_data", "tool": "json", "action": "parse", "inputs": {"value": '{"base_salary":2000,"total_sales":12000}'}},
+        {"id": "base_salary", "tool": "json", "action": "get", "inputs": {"value": {"$ref": "parse_initial_data"}, "path": "base_salary"}},
+        {"id": "total_sales", "tool": "json", "action": "get", "inputs": {"value": {"$ref": "parse_initial_data"}, "path": "total_sales"}},
+        {"id": "commission", "tool": "calculator", "action": "multiply", "inputs": {"a": {"$ref": "total_sales"}, "b": 0.1}},
+        {"id": "earnings", "tool": "calculator", "action": "add", "inputs": {"a": {"$ref": "base_salary"}, "b": {"$ref": "commission"}}},
+    ]}
+    result = WorkflowPlanner(response_generator=lambda _: json.dumps(workflow)).plan("calculate sales commission")
+    assert [step.action for step in result.steps[:3]] == ["parse", "get", "get"]
+    assert result.steps[-1].inputs["a"] == {"$ref": "base_salary"}
+
+
 def test_planner_accepts_json_markdown_fence():
     planner = WorkflowPlanner(response_generator=lambda _: f"```json\n{json.dumps(VALID_WORKFLOW)}\n```")
     assert planner.plan("uppercase hello").name == "Normalize text"
