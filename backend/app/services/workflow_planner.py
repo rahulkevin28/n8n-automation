@@ -39,7 +39,8 @@ class WorkflowPlanner:
         actions = self.registry.available_actions()
         prompt = (
             "Create the simplest workflow that completes the user's task. Return only one JSON object "
-            "matching the Workflow schema: id, name, description, steps. Each step has id, tool, action, "
+            "matching the canonical Workflow schema exactly: id, name, description, steps. NEVER use workflow_id. "
+            "Each step MUST have canonical fields id, tool, action, and inputs. NEVER use step_id and never omit tool or action. "
             "inputs and may have max_retries (0-5), timeout_seconds (>0), true_next and false_next. "
             f"The only allowed tool actions are {json.dumps(actions)}. "
             f"Use these exact input argument names for each action: {json.dumps(self.registry.input_schema())}. "
@@ -63,7 +64,7 @@ class WorkflowPlanner:
                 logger.exception("Workflow planner response generation failed")
                 raise WorkflowPlanningError("Workflow generation failed") from exc
             try:
-                data: Any = json.loads(_strip_json_fence(raw))
+                data: Any = _normalize_aliases(json.loads(_strip_json_fence(raw)))
                 workflow = Workflow.model_validate(data)
                 for step in workflow.steps:
                     if self.registry.get(step.tool, step.action) is None:
@@ -90,6 +91,22 @@ class WorkflowPlanner:
 def _strip_json_fence(response: str) -> str:
     match = re.fullmatch(r"\s*```(?:json)?\s*(.*?)\s*```\s*", response, re.DOTALL | re.IGNORECASE)
     return match.group(1) if match else response
+
+
+def _normalize_aliases(data: Any) -> Any:
+    """Accept only unambiguous ID aliases; required tool/action fields remain mandatory."""
+    if not isinstance(data, dict):
+        return data
+    normalized = dict(data)
+    if "id" not in normalized and "workflow_id" in normalized:
+        normalized["id"] = normalized.pop("workflow_id")
+    steps = normalized.get("steps")
+    if isinstance(steps, list):
+        normalized["steps"] = [
+            ({**step, "id": step["step_id"]} if isinstance(step, dict) and "id" not in step and "step_id" in step else step)
+            for step in steps
+        ]
+    return normalized
 
 
 def _validate_references(workflow: Workflow) -> None:

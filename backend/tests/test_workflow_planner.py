@@ -34,6 +34,19 @@ def test_planner_accepts_json_markdown_fence():
     assert planner.plan("uppercase hello").name == "Normalize text"
 
 
+def test_planner_rejects_alias_response_when_tool_and_action_are_missing():
+    malformed = {"workflow_id": "wf_legacy", "name": "Legacy", "description": "", "steps": [{"step_id": "s1", "inputs": {"text": "hello"}}]}
+    with pytest.raises(InvalidPlannerResponse, match="tool"):
+        WorkflowPlanner(response_generator=lambda _: json.dumps(malformed)).plan("uppercase hello")
+
+
+def test_planner_normalizes_unambiguous_id_aliases_only():
+    aliased = {"workflow_id": "wf_legacy", "name": "Legacy", "description": "", "steps": [{"step_id": "s1", "tool": "text", "action": "uppercase", "inputs": {"text": "hello"}}]}
+    result = WorkflowPlanner(response_generator=lambda _: json.dumps(aliased)).plan("uppercase hello")
+    assert result.id == "wf_legacy"
+    assert result.steps[0].id == "s1"
+
+
 @pytest.mark.parametrize("response", ["not json", "{}", json.dumps({**VALID_WORKFLOW, "steps": "invalid"})])
 def test_planner_rejects_invalid_json_or_schema(response):
     with pytest.raises(InvalidPlannerResponse):
