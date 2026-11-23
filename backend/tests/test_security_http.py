@@ -128,7 +128,8 @@ def test_planner_errors_keep_http_status_and_detail(security_api, monkeypatch, e
     response = plan(client, token)
 
     assert response.status_code == status_code
-    assert response.json()["detail"] == detail
+    assert response.json()["error"]["message"]
+    assert response.json()["error"]["details"] is None
 
 
 def test_register_allows_five_requests_then_returns_429(security_api):

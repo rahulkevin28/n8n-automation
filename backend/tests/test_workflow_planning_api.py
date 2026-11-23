@@ -64,4 +64,4 @@ def test_authenticated_planning_preserves_validation_errors(planning_client, mon
     response = request("/workflows/plan", json={"task_description": "run an unsupported tool"})
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Unsupported tool action"
+    assert response.json()["error"]["code"] == "WORKFLOW_ACTION_UNAVAILABLE"

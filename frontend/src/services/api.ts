@@ -71,11 +71,15 @@ export type DashboardStats = {
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code: string
+  readonly details?: unknown
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code = 'UNKNOWN_ERROR', details?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
+    this.details = details
   }
 }
 
@@ -99,7 +103,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const message = response.status === 401
+    type ErrorEnvelope = { error?: { code?: unknown; message?: unknown; details?: unknown } }
+    let serverError: ErrorEnvelope | null = null
+    try { serverError = await response.clone().json() as ErrorEnvelope } catch { /* use status fallback */ }
+    const envelope = serverError?.error
+    const message = typeof envelope?.message === 'string' ? envelope.message : response.status === 401
       ? 'Your email or password is incorrect, or your session has expired.'
       : response.status === 409
         ? 'An account with that email already exists.'
@@ -112,7 +120,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           : response.status === 502 || response.status === 503
             ? 'The workflow service is temporarily unavailable. Please try again shortly.'
             : 'FlowForge AI could not complete the request. Please try again.'
-    throw new ApiError(message, response.status)
+    throw new ApiError(
+      message,
+      response.status,
+      typeof envelope?.code === 'string' ? envelope.code : 'HTTP_ERROR',
+      envelope?.details,
+    )
   }
 
   try {

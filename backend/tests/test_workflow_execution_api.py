@@ -67,7 +67,7 @@ def test_approved_workflow_executes_and_returns_step_output(client_with_database
 def test_unapproved_workflow_is_rejected_without_execution(client_with_database):
     response = client_with_database.post("/workflows/execute", json=request_body(approved=False))
     assert response.status_code == 403
-    assert response.json()["detail"] == "Explicit approval is required to execute a workflow"
+    assert response.json()["error"]["code"] == "EXECUTION_NOT_APPROVED"
 
 
 def test_failed_step_is_returned_in_execution_result(client_with_database):
@@ -89,7 +89,8 @@ def test_unavailable_tool_is_rejected_before_any_step_runs(client_with_database)
         {"id": "step_2", "tool": "unknown", "action": "run", "inputs": {}},
     ]))
     assert response.status_code == 422
-    assert response.json()["detail"]["actions"] == ["unknown.run"]
+    assert response.json()["error"]["code"] == "WORKFLOW_ACTION_UNAVAILABLE"
+    assert response.json()["error"]["details"]["actions"] == ["unknown.run"]
 
 
 def test_invalid_workflow_is_rejected_by_request_validation(client_with_database):

@@ -1,11 +1,12 @@
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from app.api.workflows import router as workflows_router
 from app.api.auth import router as auth_router
 from app.core.database import DATABASE_URL, create_tables
+from app.core.errors import error_response, http_exception_handler, unexpected_exception_handler, validation_exception_handler
 
 
 # SQLite remains convenient for local development. PostgreSQL schema changes
@@ -18,6 +19,9 @@ app = FastAPI(
     description="AI-powered workflow automation platform",
     version="0.1.0",
 )
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unexpected_exception_handler)
 
 
 @app.middleware("http")
@@ -33,7 +37,7 @@ async def request_size_limit(request: Request, call_next):
             content_length = request.headers.get("content-length")
             try:
                 if content_length is not None and int(content_length) > limit:
-                    return JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+                    return error_response(413, "REQUEST_BODY_TOO_LARGE", "Request body is too large.")
             except ValueError:
                 # An invalid length is not trusted; enforce the limit from the body stream.
                 pass
@@ -43,7 +47,7 @@ async def request_size_limit(request: Request, call_next):
             async for chunk in request.stream():
                 body_size += len(chunk)
                 if body_size > limit:
-                    return JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+                    return error_response(413, "REQUEST_BODY_TOO_LARGE", "Request body is too large.")
                 body_chunks.append(chunk)
 
             body = b"".join(body_chunks)

@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 from fastapi.responses import JSONResponse
@@ -53,9 +54,11 @@ def test_oversized_stream_is_rejected_without_trusting_missing_or_short_length(c
     response = asyncio.run(request_size_limit(request, call_next))
 
     assert response.status_code == 413
-    assert response.body == JSONResponse(
-        status_code=413, content={"detail": "Request body is too large"}
-    ).body
+    assert json.loads(response.body) == {"error": {
+        "code": "REQUEST_BODY_TOO_LARGE",
+        "message": "Request body is too large.",
+        "details": None,
+    }}
     assert not downstream_called
 
 
