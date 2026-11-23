@@ -82,6 +82,7 @@ export function ExecutionHistory({ knownWorkflowIds }: { knownWorkflowIds: strin
               <div className="execution-step-heading"><strong>{step.step_id ?? step.id}</strong><span className={`execution-status ${step.status}`}>{step.status}</span></div>
               {step.output !== null && step.output !== undefined && <pre>{formatOutput(step.output)}</pre>}
               {step.error && <p className="execution-error">{step.error}</p>}
+              {step.attempts !== undefined && step.status !== 'skipped' && <small>{step.attempts} {step.attempts === 1 ? 'attempt' : 'attempts'}</small>}
             </article>)}</div>
           </>}
         </div>

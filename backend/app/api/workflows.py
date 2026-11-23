@@ -174,6 +174,7 @@ def execute_workflow(request: WorkflowExecutionRequest, user: UserRecord = Depen
                 step_id=step.id,
                 position=index,
                 status=step.status,
+                attempts=step.attempts,
                 output=_json_safe(step.output),
                 error=step.error,
             )
@@ -218,6 +219,7 @@ def get_execution(execution_id: str, user: UserRecord = Depends(current_user), d
             {
                 "step_id": step.step_id,
                 "status": step.status,
+                "attempts": step.attempts,
                 "output": step.output,
                 "error": step.error,
             }

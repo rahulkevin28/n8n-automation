@@ -78,6 +78,7 @@ def test_approved_execution_persists_workflow_execution_and_step(client_with_dat
     assert detail.json()["steps"] == [{
         "step_id": "uppercase-step",
         "status": "success",
+        "attempts": 1,
         "output": "HELLO",
         "error": None,
     }]
@@ -108,3 +109,38 @@ def test_failed_execution_and_step_statuses_are_persisted(client_with_database):
     assert detail.json()["status"] == "failed"
     assert [step["status"] for step in detail.json()["steps"]] == ["failed", "skipped"]
     assert detail.json()["steps"][0]["error"] == "cannot divide by zero"
+
+
+def test_retry_attempts_are_persisted_and_returned_in_execution_history(client_with_database, monkeypatch):
+    from app.api import workflows as workflow_api
+
+    calls = {"count": 0}
+
+    def flaky(**inputs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("temporary")
+        return "ok"
+
+    monkeypatch.setattr(workflow_api, "create_default_registry", lambda: _registry_with_flaky(flaky))
+    request = approved_workflow()
+    request["workflow"]["id"] = "retry-history"
+    request["workflow"]["steps"] = [{
+        "id": "retry-step", "tool": "mock", "action": "flaky", "max_retries": 1,
+    }]
+
+    response = client_with_database.post("/workflows/execute", json=request)
+    assert response.status_code == 200
+    assert response.json()["steps"][0]["attempts"] == 2
+
+    detail = client_with_database.get(f"/executions/{response.json()['execution_id']}")
+    assert detail.status_code == 200
+    assert detail.json()["steps"][0]["attempts"] == 2
+
+
+def _registry_with_flaky(function):
+    from app.engine.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.register("mock", "flaky", function)
+    return registry

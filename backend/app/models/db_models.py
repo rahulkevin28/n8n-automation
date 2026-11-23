@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -52,6 +52,7 @@ class ExecutionStepRecord(Base):
     execution_id: Mapped[str] = mapped_column(ForeignKey("executions.id"), index=True, nullable=False)
     position: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     output: Mapped[object | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     execution: Mapped[ExecutionRecord] = relationship(back_populates="steps")

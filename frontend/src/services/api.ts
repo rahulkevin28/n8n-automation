@@ -25,6 +25,7 @@ export type ExecutionStepResult = {
   status: 'success' | 'failed' | 'skipped'
   output: unknown
   error: string | null
+  attempts?: number
 }
 
 export type WorkflowExecutionResult = {
