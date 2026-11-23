@@ -123,6 +123,10 @@ def execute_workflow(request: WorkflowExecutionRequest, user: UserRecord = Depen
     if request.approved is not True:
         raise HTTPException(status_code=403, detail="Explicit approval is required to execute a workflow")
 
+    workflow_record = db.get(WorkflowRecord, request.workflow.id)
+    if workflow_record is not None and workflow_record.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     registry = create_default_registry()
     unavailable = [
         f"{step.tool}.{step.action}"
@@ -147,7 +151,6 @@ def execute_workflow(request: WorkflowExecutionRequest, user: UserRecord = Depen
     workflow_data = request.workflow.model_dump(mode="json")
     execution_id = str(uuid4())
     try:
-        workflow_record = db.scalar(select(WorkflowRecord).where(WorkflowRecord.id == request.workflow.id, WorkflowRecord.user_id == user.id))
         if workflow_record is None:
             workflow_record = WorkflowRecord(
                 id=request.workflow.id,
@@ -199,7 +202,10 @@ def list_workflow_executions(workflow_id: str, user: UserRecord = Depends(curren
     if workflow is None:
         raise HTTPException(status_code=404, detail="Workflow not found")
     executions = db.scalars(
-        select(ExecutionRecord).where(ExecutionRecord.workflow_id == workflow_id)
+        select(ExecutionRecord).where(
+            ExecutionRecord.workflow_id == workflow_id,
+            ExecutionRecord.user_id == user.id,
+        )
         .order_by(ExecutionRecord.created_at.desc())
     ).all()
     return {
