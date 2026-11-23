@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.security import current_user
+from app.models.db_models import UserRecord
 from main import app
 
 
@@ -26,6 +28,9 @@ def client_with_database():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[current_user] = lambda: UserRecord(
+        id="execution-test-user", email="execution-test@example.com", password_hash="unused"
+    )
     client = TestClient(app)
     try:
         yield client
@@ -54,7 +59,9 @@ def test_approved_workflow_executes_and_returns_step_output(client_with_database
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "success"
-    assert body["steps"] == [{"id": "step_1", "status": "success", "output": "HELLO", "error": None}]
+    assert body["steps"] == [{
+        "id": "step_1", "status": "success", "output": "HELLO", "error": None, "attempts": 1
+    }]
 
 
 def test_unapproved_workflow_is_rejected_without_execution(client_with_database):

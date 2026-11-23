@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.security import current_user
+from app.models.db_models import UserRecord
 from main import app
 
 
@@ -22,6 +24,9 @@ def client_with_database():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[current_user] = lambda: UserRecord(
+        id="persistence-test-user", email="persistence-test@example.com", password_hash="unused"
+    )
     client = TestClient(app)
     try:
         yield client
@@ -37,14 +42,30 @@ def workflow(workflow_id="saved-1", name="Saved workflow"):
     ]}
 
 
+def validated_workflow(payload):
+    return {
+        **payload,
+        "steps": [
+            {
+                **step,
+                "true_next": None,
+                "false_next": None,
+                "max_retries": 0,
+                "timeout_seconds": None,
+            }
+            for step in payload["steps"]
+        ],
+    }
+
+
 def test_create_list_and_retrieve_workflow(client_with_database):
     client = client_with_database
     payload = workflow()
     created = client.post("/workflows", json=payload)
     assert created.status_code == 201
-    assert created.json() == payload
-    assert client.get("/workflows").json() == [payload]
-    assert client.get("/workflows/saved-1").json() == payload
+    assert created.json() == validated_workflow(payload)
+    assert client.get("/workflows").json() == [validated_workflow(payload)]
+    assert client.get("/workflows/saved-1").json() == validated_workflow(payload)
 
 
 def test_update_workflow_persists_new_definition(client_with_database):
@@ -54,7 +75,7 @@ def test_update_workflow_persists_new_definition(client_with_database):
     updated["steps"][0]["inputs"]["text"] = "updated"
     response = client.put("/workflows/saved-1", json=updated)
     assert response.status_code == 200
-    assert client.get("/workflows/saved-1").json() == updated
+    assert client.get("/workflows/saved-1").json() == validated_workflow(updated)
 
 
 def test_missing_and_duplicate_workflows_have_clear_errors(client_with_database):

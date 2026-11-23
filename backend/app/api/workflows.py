@@ -14,6 +14,7 @@ from app.engine.executor import WorkflowExecutor
 from app.engine.registry import create_default_registry
 from app.core.database import get_db
 from app.core.security import current_user
+from app.core.rate_limit import limit_planning
 from app.models.db_models import ExecutionRecord, ExecutionStepRecord, WorkflowRecord, UserRecord
 from app.services.workflow_planner import (
     InvalidPlannerResponse,
@@ -46,7 +47,7 @@ def dashboard_stats(user: UserRecord = Depends(current_user), db: Session = Depe
 
 
 class WorkflowPlanRequest(BaseModel):
-    task_description: str = Field(min_length=1)
+    task_description: str = Field(min_length=1, max_length=4000)
 
 
 class WorkflowExecutionRequest(BaseModel):
@@ -106,7 +107,7 @@ def update_workflow(workflow_id: str, workflow: Workflow, user: UserRecord = Dep
 
 
 @router.post("/workflows/plan", response_model=Workflow)
-def plan_workflow(request: WorkflowPlanRequest) -> Workflow:
+def plan_workflow(request: WorkflowPlanRequest, user: UserRecord = Depends(current_user), _limit: None = Depends(limit_planning)) -> Workflow:
     try:
         return WorkflowPlanner().plan(request.task_description)
     except InvalidToolSelection as exc:

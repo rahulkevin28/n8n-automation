@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.rate_limit import limit_auth_requests, limit_registration
 from app.core.security import create_access_token, current_user, hash_password, verify_password
 from app.models.db_models import UserRecord
 
@@ -27,7 +28,7 @@ class Credentials(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[Depends(limit_registration)])
 def register(credentials: Credentials, db: Session = Depends(get_db)):
     if db.scalar(select(UserRecord).where(UserRecord.email == credentials.email)):
         raise HTTPException(status_code=409, detail="An account with that email already exists")
@@ -41,7 +42,7 @@ def register(credentials: Credentials, db: Session = Depends(get_db)):
     return {"access_token": create_access_token(user.id), "token_type": "bearer"}
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(limit_auth_requests)])
 def login(credentials: Credentials, db: Session = Depends(get_db)):
     user = db.scalar(select(UserRecord).where(UserRecord.email == credentials.email))
     if user is None or not verify_password(credentials.password, user.password_hash):

@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.security import current_user
+from app.models.db_models import UserRecord
 from main import app
 
 
@@ -26,6 +28,9 @@ def client_with_database():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[current_user] = lambda: UserRecord(
+        id="history-test-user", email="history-test@example.com", password_hash="unused"
+    )
     # Avoid app lifespan startup here: production startup creates the real local DB.
     client = TestClient(app)
     try:
